@@ -48,7 +48,7 @@ def singlewire_pio():
     set(pins, 0).side(1)[0]
     out(x, 1)                  .side(1)[0]  # short pulse 200 ns
     jmp(x_not_y, "addr_zero")    .side(1)[0]
-    nop()                      .side(1)[5]  # long pulse 800ns
+    nop()                      .side(1)[8]  # long pulse 800ns
 
     label("addr_zero")
     
@@ -77,7 +77,7 @@ def singlewire_pio():
     set(pins,0)                .side(1)[0] # start bit? 
     out(x,1)                   .side(1)[0]
     jmp(x_not_y, "data_zero")    .side(1)[0]
-    nop()                      .side(1)[5]
+    nop()                      .side(1)[8] # length of long pulse
 
     label("data_zero")
     set(pins,1)                .side(1)[0] 
