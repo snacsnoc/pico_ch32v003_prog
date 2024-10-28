@@ -6,7 +6,14 @@ def dut():
     set(pins, 0)
     wrap_target()
     nop() .side(1)
+    in_(pins, 1)
     nop() .side(0)
+    in_(pins, 1)
+    nop() .side(1)
+    in_(pins, 1)
+    nop() .side(0)
+    in_(pins, 1)
+    push()
     wrap()
 
 gpio61 = Pin(18, Pin.IN, pull=Pin.PULL_UP)
@@ -22,6 +29,7 @@ machine.mem32[SM0_EXECCTRL] = machine.mem32[SM0_EXECCTRL]  | (1 << SIDE_PINDIR)
 sm.restart()
 sm.active(1)
 time.sleep_ms(100)
+print(bin(sm.get()))
 sm.active(0)
 
 
