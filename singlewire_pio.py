@@ -13,7 +13,8 @@ import rp2
 ## Stop = high 2250 ns
 
 
-@rp2.asm_pio(sideset_init=rp2.PIO.OUT_HIGH)  
+#@rp2.asm_pio(sideset_init=rp2.PIO.OUT_HIGH)  
+@rp2.asm_pio(set_init=rp2.PIO.OUT_HIGH, out_init=rp2.PIO.OUT_HIGH, sideset_init=rp2.PIO.OUT_LOW)
 def singlewire_pio(autopush=True):
 
     wrap_target()
