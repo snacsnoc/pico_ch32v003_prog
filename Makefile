@@ -1,6 +1,9 @@
 # all: test_sideset_pindirs
 #all: test_singlewire_read_pio
-all: 
+
+all: singlewire
+
+singlewire:
 	mpremote a1 cp singlewire_pio.py :
 	mpremote a1 run test_singlewire.py
 

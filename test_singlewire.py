@@ -38,9 +38,16 @@ SM0_EXECCTRL = const(PIO0_BASE + 0x0cc)  # p 375
 ## need to invert this sense like in the i2c example
 machine.mem32[SM0_EXECCTRL] = machine.mem32[SM0_EXECCTRL]  | (1 << SIDE_PINDIR)
 
+## should be a write
 swio_sm.put(WCH_DM_SHDWCFGR)
 swio_sm.put(0x5AA50400)
+
 swio_sm.active(1)
+
+## should be a read?
+swio_sm.put(WCH_DM_CFGR)
+
+
 time.sleep_ms(100)
 swio_sm.active(0)
 
