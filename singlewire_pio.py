@@ -40,6 +40,8 @@ def singlewire_pio(autopush=True):
     
     label("read_loop")
     nop()                      .side(1)[1]  #  000 ns - Start pulse. Target will drive pin low starting immediately and continue for ~800 ns to signal 0.
+#    set(pins, 1).side(1)[0]                 ## pull up hard, driven value to 1
+#    set(pins, 0).side(1)[0]                 ## reset to high-z, with driven value 0 
     nop()                      .side(0)[2]  #  200 ns - Release start pulse, wait for pin to rise if target isn't driving it
     in_(pins, 1)               .side(0)[2]  #  500 ns - Read pin and then wait for target to release it.
     jmp(x_dec, "read_loop")    .side(0)[2]  #  800 ns - Pin should be going high by now.

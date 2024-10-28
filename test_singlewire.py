@@ -9,7 +9,7 @@ WCH_DM_PART     = const(0x007F) # not in doc but appears to be part info
 
 gpio61 = Pin(18, mode=Pin.IN, pull=Pin.PULL_UP)
 
-swio_sm = rp2.StateMachine(0, singlewire_pio.singlewire_pio, freq=2_000_000,
+swio_sm = rp2.StateMachine(0, singlewire_pio.singlewire_pio, freq=10_000_000,
             sideset_base=gpio61, out_base=gpio61, set_base=gpio61, in_base=gpio61)
 
 ## Some unavoidable bit-twiddling
@@ -21,6 +21,13 @@ OEOVER = const(12)
 OUTOVER = const(8)
 # GPIO_CTRL_REGs[18] |= (1 << OEOVER)
 # GPIO_CTRL_REGs[18] |= (1 << OUTOVER)
+
+## fast slew rate?
+PADS_BANK0_BASE = const(0x4001c000)
+PADS_BANK0_GPIO_REGs = [PADS_BANK0_BASE + x + 4 for x in range(0, 4*30, 4)]
+SLEWFAST = const(0)
+#machine.mem32[PADS_BANK0_GPIO_REGs[18]] |= (1 << SLEWFAST)
+
 
 
 SIDE_PINDIR = const(29)
