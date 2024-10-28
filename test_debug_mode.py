@@ -40,7 +40,7 @@ def read_address(register):
 def write_address(register):
     return((register << 1) + 1)
 
-inter_packet_delay = 60
+inter_packet_delay = 60 
 
 def send_write(address, data, delay=inter_packet_delay):
     swio_sm.put(write_address(address))

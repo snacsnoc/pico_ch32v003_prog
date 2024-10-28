@@ -41,7 +41,7 @@ def singlewire_pio():
     pull()                     .side(1)[1]  #  Pull the address from the fifo and let the bus pull high for 300 ns
     set(pins, 0).side(1)[0]
     out(y, 24)                 .side(1)[0]  #  Move high 24 bits of the address to y and send the start bit
-    set(pins, 1).side(1)[1]
+    set(pins, 1).side(1)[3]
     set(y, 0).side(1)[0]   ## use this to compare to x to make an "x is 1" test
 
     label("addr_loop")
@@ -53,7 +53,7 @@ def singlewire_pio():
     label("addr_zero")
     
     set(pins, 1).side(1)[0]
-    jmp(not_osre, "addr_loop") .side(1)[1]  # end bit, pull up 300 ns
+    jmp(not_osre, "addr_loop") .side(1)[3]  # end bit, pull up 300 ns
     jmp(x_not_y, "op_write")     .side(1)[0]  # Read/write bit
     
     label("op_read")
@@ -80,7 +80,7 @@ def singlewire_pio():
     nop()                      .side(1)[8] # length of long pulse
 
     label("data_zero")
-    set(pins,1)                .side(1)[0] 
+    set(pins,1)                .side(1)[2] 
     jmp(not_osre, "write_loop").side(1)[2] # end bit and pull up for 300 ns
     set(pins, 1)                .side(1)[10]  ## stop bit 
     jmp("start")               .side(1)[10]
