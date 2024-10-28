@@ -5,6 +5,17 @@
 from machine import Pin
 import time
 
+    # ## glitch replaces
+    # nop() .side(0)[2] # rising
+    
+    # with
+
+    # set(pins, 1).side(1)[0] ## glitch up
+    # set(pins, 0).side(0)[0] ## undo glitch, and go high-z
+    # nop().side(0)[0]
+
+
+
 @rp2.asm_pio(set_init=rp2.PIO.OUT_HIGH, out_init=rp2.PIO.OUT_HIGH, sideset_init=rp2.PIO.OUT_LOW)
 def dut():
     set(pins, 0)
@@ -13,7 +24,7 @@ def dut():
     nop() .side(1)[4] #falling
     in_(pins, 1)
     
-    set(pins, 1).side(1)[0] ## glitch up, hold high?
+    set(pins, 1).side(1)[0] ## glitch up
     set(pins, 0).side(0)[0] ## undo glitch, and go high-z
     nop() .side(0)[2] # rising
     in_(pins, 1)
@@ -54,4 +65,6 @@ mosheen2.restart()
 mosheen2.active(1)
 time.sleep_ms(100)
 mosheen2.active(0)
+
+
 
