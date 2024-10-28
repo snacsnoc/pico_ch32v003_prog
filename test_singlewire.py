@@ -13,29 +13,10 @@ swio_sm = rp2.StateMachine(0, singlewire_pio.singlewire_pio, freq=10_000_000,
             sideset_base=gpio61, out_base=gpio61, set_base=gpio61, in_base=gpio61)
 
 ## Some unavoidable bit-twiddling
-
-## GPIO CTRL reg p 247
-IO_BANK0_BASE = const(0x40014000)
-GPIO_CTRL_REGs = [IO_BANK0_BASE + x + 4 for x in range(0, 8*30, 8)]
-OEOVER = const(12)
-OUTOVER = const(8)
-# GPIO_CTRL_REGs[18] |= (1 << OEOVER)
-# GPIO_CTRL_REGs[18] |= (1 << OUTOVER)
-
-## fast slew rate?
-PADS_BANK0_BASE = const(0x4001c000)
-PADS_BANK0_GPIO_REGs = [PADS_BANK0_BASE + x + 4 for x in range(0, 4*30, 4)]
-SLEWFAST = const(0)
-#machine.mem32[PADS_BANK0_GPIO_REGs[18]] |= (1 << SLEWFAST)
-
-
-
 SIDE_PINDIR = const(29)
 PIO0_BASE = const(0x50200000)
 SM0_EXECCTRL = const(PIO0_BASE + 0x0cc)  # p 375
 ## Set side-set to control pindirs on machine 0
-## doesn't work because direction not inverted -- have pullup on input and high value on output
-## need to invert this sense like in the i2c example
 machine.mem32[SM0_EXECCTRL] = machine.mem32[SM0_EXECCTRL]  | (1 << SIDE_PINDIR)
 
 ## should be a write
@@ -46,13 +27,19 @@ swio_sm.active(1)
 
 ## should be a read?
 swio_sm.put(WCH_DM_CFGR)
+print(bin(swio_sm.get()))
 
+## and then another write?
+## if you've waited a long while, you should load all the bytes together
+## is there a better way to do this?
+swio_sm.active(0)
+swio_sm.put(WCH_DM_SHDWCFGR)
+swio_sm.put(0x5AA50400)
+swio_sm.active(1)
 
-time.sleep_ms(100)
+time.sleep_us(50)
 swio_sm.active(0)
 
-## then need to figure out the calling convention.
-gpio61.value(0)
-# swio_sm.put(WCH_DM_SHDWCFGR, 0x5AA50400)
-# swio_sm.put(WCH_DM_CFGR,     0x5AA50400)
+## idle high
+gpio61.value(1)
 

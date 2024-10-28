@@ -12,25 +12,27 @@ import rp2
 ## 0    = low 750ns to 8000ns, high 125ns to 2000ns
 ## Stop = high 2250 ns
 
-    # ## glitch replaces
-    # nop() .side(0)[2] # rising
-    
-    # with
 
-    # set(pins, 1).side(1)[0] ## glitch up
-    # set(pins, 0).side(0)[0] ## undo glitch, and go high-z
-    # nop().side(0)[0]
 
-    ## when rising but needs to be able to be pulled down
+# ## glitch replaces
+# nop() .side(0)[2] # rising
 
-    ## when normal digital logic, can use 
-    # set(pins, 1).side(1)[0]
-    # set(pins, 0).side(1)[0]
+# with
+
+# set(pins, 1).side(1)[0] ## glitch up
+# set(pins, 0).side(0)[0] ## undo glitch, and go high-z
+# nop().side(0)[0]
+
+## when rising but needs to be able to be pulled down
+
+## when normal digital logic, can use 
+# set(pins, 1).side(1)[0]
+# set(pins, 0).side(1)[0]
 
 
 #@rp2.asm_pio(sideset_init=rp2.PIO.OUT_HIGH)  
-@rp2.asm_pio(set_init=rp2.PIO.OUT_HIGH, out_init=rp2.PIO.OUT_HIGH, sideset_init=rp2.PIO.OUT_LOW)
-def singlewire_pio(autopush=True):
+@rp2.asm_pio(set_init=rp2.PIO.OUT_HIGH, out_init=rp2.PIO.OUT_HIGH, sideset_init=rp2.PIO.OUT_HIGH, autopush=True)
+def singlewire_pio():
 
     wrap_target()
     label("start")
@@ -52,7 +54,6 @@ def singlewire_pio(autopush=True):
     set(pins, 1).side(1)[0]
     jmp(not_osre, "addr_loop") .side(1)[1]  # end bit, pull up 300 ns
     jmp(not_x, "op_write")     .side(1)[0]  # Read/write bit
-#     jmp("op_read")             .side(1)[0]  ## don't need, it's next label anyway?
     
     label("op_read")
     set(pins, 1).side(1)[0]   ## pull up
@@ -65,7 +66,7 @@ def singlewire_pio(autopush=True):
     in_(pins, 1)               .side(0)[2]  #  500 ns - Read pin and then wait for target to release it.
     jmp(x_dec, "read_loop")    .side(0)[2]  #  800 ns - Pin should be going high by now.
 
-    set(pins, 1)                .side(1)[6] 
+    set(pins, 1)                .side(1)[6]  ## stop bit? 
     jmp("start")               .side(1)[10]
     
     label("op_write")  ## state should still be driven high
@@ -80,7 +81,7 @@ def singlewire_pio(autopush=True):
     label("data_zero")
     set(pins,1)                .side(1)[0] 
     jmp(not_osre, "write_loop").side(1)[2] # end bit and pull up for 300 ns
-    set(pins, 1)                .side(1)[6] 
+    set(pins, 1)                .side(1)[8]  ## stop bit 
     jmp("start")               .side(1)[10]
     
     wrap()
