@@ -61,11 +61,12 @@ def singlewire_pio():
     set(x, 31)                 .side(1)[0]
 
     label("read_loop")     # loop time ~1100 ns: 11 clocks
-    set(pins,0)                .side(1)[1]  #  000 ns - Start pulse. Target will drive pin low starting immediately and continue for ~800 ns to signal 0.
+    set(pins,0)                .side(1)[0]  #  000 ns - Start pulse. Target will drive pin low starting immediately and continue for ~800 ns to signal 0.
     set(pins, 1).side(1)[0] ## glitch up
-    set(pins, 0).side(0)[1] ## undo glitch, and go high-z
-    in_(pins, 1)               .side(0)[2]  #  500 ns - Read pin and then wait for target to release it.
-    jmp(x_dec, "read_loop")    .side(0)[2]  #  800 ns - Pin should be going high by now.
+    set(pins, 0).side(0)[6] ## undo glitch, and go high-z
+    in_(pins, 1)               .side(0)[0]  #  500 ns - Read pin and then wait for target to release it.
+    set(pins, 1).side(1)[0] ## glitch up
+    jmp(x_dec, "read_loop")    .side(0)[1]  #  800 ns - Pin should be going high by now.
 
     set(pins, 1)                .side(1)[10]  ## stop bit? 
     jmp("start")               .side(1)[10]
