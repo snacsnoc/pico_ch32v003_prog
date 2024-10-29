@@ -60,7 +60,7 @@ WCH_DM_CPBR     = const(0x007C)
 WCH_DM_CFGR     = const(0x007D)
 WCH_DM_SHDWCFGR = const(0x007E)
 WCH_DM_PART     = const(0x007F) # not in doc but appears to be part info
-SECRET          = const(0x5AA5000)
+SECRET          = const(0x5AA50000)
 OUTSTA          = const(SECRET | (1 << 10)) ## OUTSTA: 0: The debug slave has output function.
 DM_CTRL         = const(0x0010)  ## in debug mode
 DM_STATUS       = const(0x0011)  # debug mode, read/write
@@ -78,13 +78,6 @@ send_write(WCH_DM_CFGR, OUTSTA)
 send_write(DM_CTRL, 0x80000001) ## 1: Debug module works properly 
 send_write(DM_CTRL, 0x80000003) ## reboot
 send_write(DM_CTRL, 0x80000001) ## 1: Debug module works properly 
-# send_write(DM_CTRL, 0x80000001) ## 1: Debug module works properly 
-# send_write(DM_CTRL, 0x80000001) ## 1: reinitiate hale
 status = send_read(DM_STATUS)
-
-## to compare with screen
-b32(write_address(WCH_DM_SHDWCFGR))
-b32(OUTSTA)
-b32(read_address(DM_STATUS))
 b32(status)
 
