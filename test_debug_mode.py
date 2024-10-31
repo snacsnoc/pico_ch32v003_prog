@@ -2,6 +2,8 @@
 import singlewire_pio
 import gc
 from machine import Pin
+from constants import *
+
 
 gpio61 = Pin(18, mode=Pin.IN, pull=Pin.PULL_UP)
 
@@ -56,60 +58,22 @@ def send_read(address, delay=inter_packet_delay):
     swio_sm.active(0)
     return(swio_sm.get())
 
-WCH_DM_CPBR     = const(0x007C)
-WCH_DM_CFGR     = const(0x007D)
-WCH_DM_SHDWCFGR = const(0x007E)
-WCH_DM_PART     = const(0x007F) # not in doc but appears to be part info
-SECRET          = const(0x5AA50000)
-OUTSTA          = const(SECRET | (1 << 10)) ## OUTSTA: 0: The debug slave has output function.
-DM_CTRL         = const(0x0010)  ## in debug mode
-DM_STATUS       = const(0x0011)  # debug mode, read/write
-
-# MCF.WriteReg32( dev, DMSHDWCFGR, 0x5aa50000 | (1<<10) ); // Shadow Config Reg
-# MCF.WriteReg32( dev, DMCFGR, 0x5aa50000 | (1<<10) ); // CFGR (1<<10 == Allow output from slave)
-# MCF.WriteReg32( dev, DMCONTROL, 0x80000001 ); // Make the debug module work properly.
-# if( mode == HALT_MODE_HALT_AND_RESET ) MCF.WriteReg32( dev, DMCONTROL, 0x80000003 ); // Reboot.
-# MCF.WriteReg32( dev, DMCONTROL, 0x80000001 ); // Re-initiate a halt request.
-
 ## blip?
 
-send_write(WCH_DM_SHDWCFGR, OUTSTA)
-send_write(WCH_DM_CFGR, OUTSTA)
-send_write(DM_CTRL, 0x80000001) ## 1: Debug module works properly 
-send_write(DM_CTRL, 0x80000003) ## reboot
-send_write(DM_CTRL, 0x80000001) ## 1: Debug module works properly 
-status = send_read(DM_STATUS)
-capabilities = send_read(WCH_DM_CPBR)
-b32(status)
-b32(capabilities)
+def enter_debug_mode():
+    send_write(WCH_DM_SHDWCFGR, OUTSTA)
+    send_write(WCH_DM_CFGR, OUTSTA)
+    send_write(DM_CTRL, 0x80000001) ## 1: Debug module works properly 
+    send_write(DM_CTRL, 0x80000003) ## reboot
+    send_write(DM_CTRL, 0x80000001) ## 1: Debug module works properly 
+
+def print_status_capabilities():
+    status = send_read(DM_STATUS)
+    capabilities = send_read(WCH_DM_CPBR)
+    b32(status)
+    b32(capabilities)
 
 ## OK, now flash in the bootloader
-## Some debug-mode constants
-DMDATA0 = const(0x04)
-DMDATA1 = const(0x05)
-DMCONTROL = const(0x10)
-DMSTATUS = const(0x11)
-DMHARTINFO = const(0x12)
-DMABSTRACTCS = const(0x16)
-DMCOMMAND = const(0x17)
-DMABSTRACTAUTO = const(0x18)
-
-FLASH_STATR_WRPRTERR = const(0x10)
-CR_PAGE_PG           = const(0x00010000)
-CR_BUF_LOAD          = const(0x00040000)
-FLASH_CTLR_MER       = const(0x0004)   #  /* Mass Erase */)
-CR_STRT_Set          = const(0x00000040)
-CR_PAGE_ER           = const(0x00020000)
-CR_BUF_RST           = const(0x00080000)
-
-DMPROGBUF0 = const(0x20)
-DMPROGBUF1 = const(0x21)
-DMPROGBUF2 = const(0x22)
-DMPROGBUF3 = const(0x23)
-DMPROGBUF4 = const(0x24)
-DMPROGBUF5 = const(0x25)
-DMPROGBUF6 = const(0x26)
-DMPROGBUF7 = const(0x27)
 
 def wait_for_done():
     is_busy = True
@@ -139,9 +103,8 @@ def setup_flash(data, address):
 
     send_write( DMDATA1, address )  #;
     send_write( DMDATA0, data )  #;
-
     send_write( DMCOMMAND, 0x00271008 )  #; // Copy data0 to x8, and execute program.
-    send_write( DMABSTRACTAUTO, 1 )  #; // Enable Autoexec.
+    
     wait_for_done()
 
 def write_word(data, address):
@@ -151,52 +114,57 @@ def write_word(data, address):
 
 def flash_bin(filename):
     binary_image = open(filename, "b").read()
-    if len(binary_image) % 4 != 0:
+    if len(binary_image) % 2 != 0:
         raise BaseException("Binary not even word length, handle me!")
 
     address = 0x08000000 
     first_time = True
-    for wordstart in range(0, len(binary_image), 4):
-        word = binary_image[wordstart:(wordstart+4)]
-        print(word.hex())
-        word_value = int(word[0] << 24) + int(word[1] << 16) + int(word[2] << 8) + int(word[3])
+    for wordstart in range(0, len(binary_image), 2):
+        high_byte = binary_image[wordstart]
+        low_byte = binary_image[wordstart+1]
+        word_value = int(high_byte << 8) + int(low_byte)
         if first_time:
             setup_flash(word_value, address)
             first_time = False
         else:
             write_word(word_value, address)
-        address = address + 4
+        address = address + 2
+    flash_ctrler = send_read(FLASH_CTLR)
+    b32(flash_ctrler)
+    print("disabling PG")
+    send_write(FLASH_CTLR, flash_ctrler & ~(1 << 0) )
+    flash_ctrler = send_read(FLASH_CTLR)
+    b32(flash_ctrler)
 
-# flash_bin("blink.bin")
+def unlock_flash():
+    KEY1 = const(0x45670123)
+    KEY2 = const(0xCDEF89AB)
+    send_write( 0x40022004, KEY1 ) # FLASH->KEYR = 0x40022004
+    send_write( 0x40022004, KEY2)  
+    send_write( 0x40022008, KEY1 )  # OBKEYR = 0x40022008
+    send_write( 0x40022008, KEY2 )  
+    send_write( 0x40022024, KEY1 )  # MODEKEYR = 0x40022024
+    send_write( 0x40022024, KEY2 )  #;
 
-print("unlocking flash")
-flash_ctrler = send_read(0x40022010)
-b32(flash_ctrler)
-
-
-send_write( 0x40022004, 0x45670123 )  #; // FLASH->KEYR = 0x40022004
-send_write( 0x40022004, 0xCDEF89AB )  #;
-send_write( 0x40022008, 0x45670123 )  #; // OBKEYR = 0x40022008
-send_write( 0x40022008, 0xCDEF89AB )  #;
-send_write( 0x40022024, 0x45670123 )  #; // MODEKEYR = 0x40022024
-send_write( 0x40022024, 0xCDEF89AB )  #;
-
-flash_ctrler = send_read(0x40022010)
-b32(flash_ctrler)
-
+    # standard programming operations
+    flash_ctrler = send_read(FLASH_CTLR)
+    b32(flash_ctrler)
+    print("enabling PG")
+    send_write(FLASH_CTLR, flash_ctrler | (1 << 0) )
+    flash_ctrler = send_read(FLASH_CTLR)
+    b32(flash_ctrler)
 
 ## reset and resume
-if True:
-    status = send_read(DM_STATUS)
-    b32(status)
+def reset_and_resume():
     send_write( DM_CTRL, 0x80000001)  
     send_write( DM_CTRL, 0x80000001) 
     send_write( DM_CTRL, 0x00000001)  
     send_write( DM_CTRL, 0x40000001)
-    time.sleep_us(30)
-    status = send_read(DM_STATUS)
-    b32(status)
 
+enter_debug_mode()
+unlock_flash()
+flash_bin("blink.bin")
+reset_and_resume()
 
 
 
