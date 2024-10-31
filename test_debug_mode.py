@@ -79,8 +79,8 @@ send_write(DM_CTRL, 0x80000001) ## 1: Debug module works properly
 send_write(DM_CTRL, 0x80000003) ## reboot
 send_write(DM_CTRL, 0x80000001) ## 1: Debug module works properly 
 status = send_read(DM_STATUS)
-b32(status)
 capabilities = send_read(WCH_DM_CPBR)
+b32(status)
 b32(capabilities)
 
 ## OK, now flash in the bootloader
@@ -118,7 +118,7 @@ def wait_for_done():
         if (abstract_control_status & (1 << 12)) == 0:  ## abstract command busy bit
             is_busy = False
 
-def setup_flash():
+def setup_flash(data, address):
     send_write( DMABSTRACTAUTO, 0x00000000 )  #; // Disable Autoexec.
     ## Program loads up data, writes it into memory, adds 4 to address, and stores it back
     send_write( DMPROGBUF0, 0xc0804184 )  #  c.sw x8, 0(x9)  c.lw x9, 0(x11)
@@ -130,23 +130,23 @@ def setup_flash():
     
     send_write( DMDATA0, 0xe00000f4 )  #;   // DATA0's location in memory.
     send_write( DMCOMMAND, 0x0023100a )  #; // Copy data to x10
-
     send_write( DMDATA0, 0xe00000f8 )  #;   // DATA1's location in memory.
     send_write( DMCOMMAND, 0x0023100b )  #; // Copy data to x11
-
     send_write( DMDATA0, 0x40022010 )  #; // FLASH->CTLR
     send_write( DMCOMMAND, 0x0023100c )  #; // Copy data to x12
-    
     send_write( DMDATA0, CR_PAGE_PG|CR_BUF_LOAD)  #;
     send_write( DMCOMMAND, 0x0023100d )  #; // Copy data to x13
 
-#    send_write( DMABSTRACTAUTO, 1)  #; // enable Autoexec on DATA0
+    send_write( DMDATA1, address )  #;
+    send_write( DMDATA0, data )  #;
+
+    send_write( DMCOMMAND, 0x00271008 )  #; // Copy data0 to x8, and execute program.
+    send_write( DMABSTRACTAUTO, 1 )  #; // Enable Autoexec.
+    wait_for_done()
 
 def write_word(data, address):
-    send_write( DMABSTRACTAUTO, 0 )  #; // Disable Autoexec.
     send_write( DMDATA1, address )  #;
     send_write( DMDATA0, data )  # load data into DMDATA0;
-    send_write( DMCOMMAND, 0x00271008 )  #; // Copy data0 to x8, and execute program.
     wait_for_done()
 
 def flash_bin(filename):
@@ -154,14 +154,17 @@ def flash_bin(filename):
     if len(binary_image) % 4 != 0:
         raise BaseException("Binary not even word length, handle me!")
 
-    setup_flash()
-
     address = 0x08000000 
+    first_time = True
     for wordstart in range(0, len(binary_image), 4):
         word = binary_image[wordstart:(wordstart+4)]
         print(word.hex())
         word_value = int(word[0] << 24) + int(word[1] << 16) + int(word[2] << 8) + int(word[3])
-        write_word(word_value, address)
+        if first_time:
+            setup_flash(word_value, address)
+            first_time = False
+        else:
+            write_word(word_value, address)
         address = address + 4
 
 flash_bin("blink.bin")
@@ -172,7 +175,8 @@ b32(status)
 send_write( DM_CTRL, 0x80000001)  
 send_write( DM_CTRL, 0x80000001) 
 send_write( DM_CTRL, 0x00000001)  
-send_write( DM_CTRL, 0x40000001) 
+send_write( DM_CTRL, 0x40000001)
+time.sleep_us(30)
 status = send_read(DM_STATUS)
 b32(status)
 
