@@ -3,7 +3,7 @@
 
 MPREMOTE:=mpremote
 
-all: test_debug_mode
+all: copy_pio test_debug_mode
 
 copy_pio: 
 	${MPREMOTE} cp singlewire_pio.py :

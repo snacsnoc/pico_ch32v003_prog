@@ -4,7 +4,6 @@ import gc
 from machine import Pin
 from constants import *
 
-
 gpio61 = Pin(18, mode=Pin.IN, pull=Pin.PULL_UP)
 
 swio_sm = rp2.StateMachine(4, singlewire_pio.singlewire_pio, freq=10_000_000,
@@ -35,7 +34,6 @@ def b32(num):
     cc= (num & 0x0000FF00) >> 8
     dd= num & 0x000000FF
     print(f'{aa:#010b} {bb:#010b} {cc:#010b} {dd:#010b}')
-
 
 def read_address(register):
     return(register << 1)
@@ -69,8 +67,10 @@ def enter_debug_mode():
 
 def print_status_capabilities():
     status = send_read(DM_STATUS)
-    capabilities = send_read(WCH_DM_CPBR)
+    print("status")
     b32(status)
+    capabilities = send_read(WCH_DM_CPBR)
+    print("capabilities")
     b32(capabilities)
 
 ## OK, now flash in the bootloader
@@ -123,11 +123,7 @@ def flash_bin(filename):
         high_byte = binary_image[wordstart]
         low_byte = binary_image[wordstart+1]
         word_value = int(high_byte << 8) + int(low_byte)
-        if first_time:
-            setup_flash(word_value, address)
-            first_time = False
-        else:
-            write_word(word_value, address)
+        write_half_word(word_value, address)
         address = address + 2
     flash_ctrler = send_read(FLASH_CTLR)
     b32(flash_ctrler)
@@ -136,7 +132,25 @@ def flash_bin(filename):
     flash_ctrler = send_read(FLASH_CTLR)
     b32(flash_ctrler)
 
+def write_half_word(data, address_to_write):
+
+    send_write( DMABSTRACTAUTO, 0x00000000 )  #; // Disable Autoexec.
+	# Different address, so we don't need to re-write all the program regs.
+	# sh x8,0(x9)  // Write to the address.
+    send_write( DMPROGBUF0, 0x00849023 )  #;
+    send_write( DMPROGBUF1, 0x00100073 )  #; // c.ebreak
+
+    send_write( DMDATA0, address_to_write )  #;
+    send_write( DMCOMMAND, 0x00231009 )  #; // Copy data to x9
+    send_write( DMDATA0, data )  #;
+    send_write( DMCOMMAND, 0x00271008 )  #; // Copy data to x8, and execute program.
+
+    wait_for_done()
+
 def unlock_flash():
+    flash_ctrler = send_read(FLASH_CTLR)
+    print("flash controller")
+    b32(flash_ctrler)
     KEY1 = const(0x45670123)
     KEY2 = const(0xCDEF89AB)
     send_write( 0x40022004, KEY1 ) # FLASH->KEYR = 0x40022004
@@ -147,12 +161,10 @@ def unlock_flash():
     send_write( 0x40022024, KEY2 )  #;
 
     # standard programming operations
-    flash_ctrler = send_read(FLASH_CTLR)
-    b32(flash_ctrler)
-    print("enabling PG")
-    send_write(FLASH_CTLR, flash_ctrler | (1 << 0) )
-    flash_ctrler = send_read(FLASH_CTLR)
-    b32(flash_ctrler)
+    if True:
+        flash_ctrler = send_read(FLASH_CTLR)
+        print("flash controller")
+        b32(flash_ctrler)
 
 ## reset and resume
 def reset_and_resume():
@@ -162,13 +174,15 @@ def reset_and_resume():
     send_write( DM_CTRL, 0x40000001)
 
 enter_debug_mode()
-unlock_flash()
+print_status_capabilities()
+print("flash size")
+flash_size = send_read(0x1FFFF7E0)
+# b32(flash_size)
+# print("hart")
+# hart = send_read(0x12)
+# b32(hart)
+
 flash_bin("blink.bin")
 reset_and_resume()
 
-
-
-
-
-    
 
