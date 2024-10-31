@@ -95,12 +95,12 @@ DMCOMMAND = const(0x17)
 DMABSTRACTAUTO = const(0x18)
 
 FLASH_STATR_WRPRTERR = const(0x10)
-CR_PAGE_PG = const(0x00010000)
-CR_BUF_LOAD = const(0x00040000)
-FLASH_CTLR_MER = const(0x0004)   #  /* Mass Erase */)
-CR_STRT_Set = const(0x00000040)
-CR_PAGE_ER = const(0x00020000)
-CR_BUF_RST = const(0x00080000)
+CR_PAGE_PG           = const(0x00010000)
+CR_BUF_LOAD          = const(0x00040000)
+FLASH_CTLR_MER       = const(0x0004)   #  /* Mass Erase */)
+CR_STRT_Set          = const(0x00000040)
+CR_PAGE_ER           = const(0x00020000)
+CR_BUF_RST           = const(0x00080000)
 
 DMPROGBUF0 = const(0x20)
 DMPROGBUF1 = const(0x21)
@@ -167,18 +167,35 @@ def flash_bin(filename):
             write_word(word_value, address)
         address = address + 4
 
-flash_bin("blink.bin")
+# flash_bin("blink.bin")
+
+print("unlocking flash")
+flash_ctrler = send_read(0x40022010)
+b32(flash_ctrler)
+
+
+send_write( 0x40022004, 0x45670123 )  #; // FLASH->KEYR = 0x40022004
+send_write( 0x40022004, 0xCDEF89AB )  #;
+send_write( 0x40022008, 0x45670123 )  #; // OBKEYR = 0x40022008
+send_write( 0x40022008, 0xCDEF89AB )  #;
+send_write( 0x40022024, 0x45670123 )  #; // MODEKEYR = 0x40022024
+send_write( 0x40022024, 0xCDEF89AB )  #;
+
+flash_ctrler = send_read(0x40022010)
+b32(flash_ctrler)
+
 
 ## reset and resume
-status = send_read(DM_STATUS)
-b32(status)
-send_write( DM_CTRL, 0x80000001)  
-send_write( DM_CTRL, 0x80000001) 
-send_write( DM_CTRL, 0x00000001)  
-send_write( DM_CTRL, 0x40000001)
-time.sleep_us(30)
-status = send_read(DM_STATUS)
-b32(status)
+if True:
+    status = send_read(DM_STATUS)
+    b32(status)
+    send_write( DM_CTRL, 0x80000001)  
+    send_write( DM_CTRL, 0x80000001) 
+    send_write( DM_CTRL, 0x00000001)  
+    send_write( DM_CTRL, 0x40000001)
+    time.sleep_us(30)
+    status = send_read(DM_STATUS)
+    b32(status)
 
 
 
