@@ -56,8 +56,6 @@ def send_read(address, delay=inter_packet_delay):
     swio_sm.active(0)
     return(swio_sm.get())
 
-## blip?
-
 def enter_debug_mode():
     send_write(WCH_DM_SHDWCFGR, OUTSTA)
     send_write(WCH_DM_CFGR, OUTSTA) ## OUTSTA: 0: The debug slave has output function.
@@ -82,11 +80,12 @@ def wait_for_done():
     is_busy = True
     while is_busy:
         abstract_control_status = send_read(DMABSTRACTCS)
+        if (abstract_control_status & (7<<8)):
+            raise Exception(f"error, bail out: abs_ctrl {hex(abstract_control_status)}")
         if (abstract_control_status & (1 << 12)) == 0:  ## abstract command busy bit
             is_busy = False
 
 def write_word(address, data):
-  
     send_write( DMABSTRACTAUTO, 0x00000000 )  #; // Disable Autoexec.
     
     send_write( DMDATA0, 0xe00000f4 )  #;   // DATA0's location in memory.
@@ -104,7 +103,6 @@ def write_word(address, data):
     wait_for_done()
 
 def read_word(address):
-   
     send_write( DMABSTRACTAUTO, 0x00000000 )  #; // Disable Autoexec.
     
     send_write( DMDATA0, 0xe00000f4 )  #;   // DATA0's location in memory.
@@ -122,80 +120,55 @@ def read_word(address):
     data = send_read(DMDATA0)
     return(data)
 
+def wait_for_flash():
+    ## add timeout
+    for i in range(200):
+        rw = read_word( 0x4002200C )  # FLASH_STATR => 0x4002200C
+        if not (rw & 1):   # BSY flag 
+            break
+    write_word( 0x4002200C, 0 )  #;
+    if( rw & FLASH_STATR_WRPRTERR ):
+        raise Exception("Misc Flash error")
 
-enter_debug_mode()
-send_write( DMABSTRACTCS, 0x00000700 )  #;
-#print_status_capabilities()
-write_word(0x20000000, 0x12345678)
-dm = send_read(DMABSTRACTCS)
-b32(dm)
-
-#print("0x12345678")
-back = read_word(0x20000000)
-print(hex(back))
-
-mem = read_word(0x1FFFF7E0)
-b32(mem)
-
-# cs = send_read(DMABSTRACTCS)
-# print(hex(cs))# 2, 27
-
-
-
-
-def flash_bin(filename):
-    binary_image = open(filename, "b").read()
-    if len(binary_image) % 2 != 0:
-        raise BaseException("Binary not even word length, handle me!")
-
-    address = 0x08000000 
-    first_time = True
-    for wordstart in range(0, len(binary_image), 2):
-        high_byte = binary_image[wordstart]
-        low_byte = binary_image[wordstart+1]
-        word_value = int(high_byte << 8) + int(low_byte)
-        write_half_word(word_value, address)
-        address = address + 2
-    flash_ctrler = send_read(FLASH_CTLR)
-    b32(flash_ctrler)
-    print("disabling PG")
-    send_write(FLASH_CTLR, flash_ctrler & ~(1 << 0) )
-    flash_ctrler = send_read(FLASH_CTLR)
-    b32(flash_ctrler)
-
-def write_half_word(data, address_to_write):
-
-    send_write( DMABSTRACTAUTO, 0x00000000 )  #; // Disable Autoexec.
-	# Different address, so we don't need to re-write all the program regs.
-	# sh x8,0(x9)  // Write to the address.
-    send_write( DMPROGBUF0, 0x00849023 )  #;
-    send_write( DMPROGBUF1, 0x00100073 )  #; // c.ebreak
-
-    send_write( DMDATA0, address_to_write )  #;
-    send_write( DMCOMMAND, 0x00231009 )  #; // Copy data to x9
-    send_write( DMDATA0, data )  #;
-    send_write( DMCOMMAND, 0x00271008 )  #; // Copy data to x8, and execute program.
-
-    wait_for_done()
+    if( rw & 1 ):
+        raise Exception("Flash timed out")
 
 def unlock_flash():
-    flash_ctrler = send_read(FLASH_CTLR)
-    print("flash controller")
-    b32(flash_ctrler)
-    KEY1 = const(0x45670123)
-    KEY2 = const(0xCDEF89AB)
-    send_write( 0x40022004, KEY1 ) # FLASH->KEYR = 0x40022004
-    send_write( 0x40022004, KEY2)  
-    send_write( 0x40022008, KEY1 )  # OBKEYR = 0x40022008
-    send_write( 0x40022008, KEY2 )  
-    send_write( 0x40022024, KEY1 )  # MODEKEYR = 0x40022024
-    send_write( 0x40022024, KEY2 )  #;
+    rw = read_word( 0x40022010 )  # FLASH->CTLR = 0x40022010
+    if( rw & 0x8080 ):
+        write_word( 0x40022004, 0x45670123 )  #; // FLASH->KEYR = 0x40022004
+        write_word( 0x40022004, 0xCDEF89AB )  #;
+        write_word( 0x40022008, 0x45670123 )  #; // OBKEYR = 0x40022008
+        write_word( 0x40022008, 0xCDEF89AB )  #;
+        write_word( 0x40022024, 0x45670123 )  #; // MODEKEYR = 0x40022024
+        write_word( 0x40022024, 0xCDEF89AB )  #;
+        rw = read_word( 0x40022010 )  # FLASH->CTLR = 0x40022010
+        if( rw & 0x8080 ):
+            raise Exception("flash could not be unlocked")
 
-    # standard programming operations
-    if True:
-        flash_ctrler = send_read(FLASH_CTLR)
-        print("flash controller")
-        b32(flash_ctrler)
+def erase_chip():
+    write_word( 0x40022010, 0 )  # FLASH->CTLR = 0x40022010
+    write_word( 0x40022010, FLASH_CTLR_MER  )  #;
+    write_word( 0x40022010, CR_STRT_Set|FLASH_CTLR_MER )  #;
+    wait_for_flash()
+    write_word( 0x40022010, 0 )  #  FLASH->CTLR = 0x40022010
+
+def simple_64_byte_write(start_address, data):
+    """start_address = MUST_BE_64_BYTE_ALIGNED;"""
+
+    write_word( 0x40022010, CR_PAGE_PG )  ##   // (intptr_t)&FLASH->CTLR = 0x40022010  
+    write_word( 0x40022010, CR_BUF_RST | CR_PAGE_PG );  
+    wait_for_flash()
+    
+    for i in range(16): 
+        addr = start_address+(i*4)
+        value = int.from_bytes(data[(i*4):(i*4)+4])
+        print(hex(addr), hex(value))
+        write_word( addr, value )
+
+    write_word( 0x40022014, start_address )  # ;
+    write_word( 0x40022010, CR_PAGE_PG|CR_STRT_Set ) #;  // R32_FLASH_CTLR
+    wait_for_flash()
 
 ## reset and resume
 def reset_and_resume():
@@ -204,7 +177,29 @@ def reset_and_resume():
     send_write( DM_CTRL, 0x00000001)  
     send_write( DM_CTRL, 0x40000001)
 
+def flash_binary(filename):
+    data = open(filename, "b").read()
+    
+    for i in range(len(data) // 64): 
+        byte_block = data[i*64:(i+1)*64]
+        simple_64_byte_write(0x0800_0000 + i*64, byte_block)
+    if len(data) % 64:
+        residual = bytearray([0xff] * 64) 
+        for j, this_byte in enumerate(data[(i+1)*64:]):
+            residual[j] = this_byte
+        simple_64_byte_write(0x0800_0000 + (i+1)*64, residual)
 
+enter_debug_mode()
+
+#unlock_flash()
+#erase_chip()
+#flash_binary("blink2.bin")
+
+for i in range(4096):
+    print(i)
+    print(hex(read_word(0x0800_0000+i*4)))
+
+#reset_and_resume()
 
 
 
