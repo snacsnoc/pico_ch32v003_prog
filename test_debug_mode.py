@@ -6,7 +6,7 @@ from constants import *
 
 gpio61 = Pin(18, mode=Pin.IN, pull=Pin.PULL_UP)
 
-swio_sm = rp2.StateMachine(4, singlewire_pio.singlewire_pio, freq=10_000_000,
+swio_sm = rp2.StateMachine(4, singlewire_pio.singlewire_pio, freq=12_000_000,
             sideset_base=gpio61, out_base=gpio61, set_base=gpio61, in_base=gpio61)
 
 ## Some unavoidable bit-twiddling
@@ -60,10 +60,13 @@ def send_read(address, delay=inter_packet_delay):
 
 def enter_debug_mode():
     send_write(WCH_DM_SHDWCFGR, OUTSTA)
-    send_write(WCH_DM_CFGR, OUTSTA)
+    send_write(WCH_DM_CFGR, OUTSTA) ## OUTSTA: 0: The debug slave has output function.
+    ## guarantee halt
     send_write(DM_CTRL, 0x80000001) ## 1: Debug module works properly 
-    send_write(DM_CTRL, 0x80000003) ## reboot
-    send_write(DM_CTRL, 0x80000001) ## 1: Debug module works properly 
+    send_write(DM_CTRL, 0x80000003) ## 1: Debug module works properly 
+    send_write(DM_CTRL, 0x80000001) ## 1: halt
+    send_write(DM_CTRL, 0x80000001) ## 1: halt
+    send_write(DM_CTRL, 0x80000001) ## 1: halt
 
 def print_status_capabilities():
     status = send_read(DM_STATUS)
@@ -82,35 +85,63 @@ def wait_for_done():
         if (abstract_control_status & (1 << 12)) == 0:  ## abstract command busy bit
             is_busy = False
 
-def setup_flash(data, address):
+def write_word(address, data):
+  
     send_write( DMABSTRACTAUTO, 0x00000000 )  #; // Disable Autoexec.
-    ## Program loads up data, writes it into memory, adds 4 to address, and stores it back
-    send_write( DMPROGBUF0, 0xc0804184 )  #  c.sw x8, 0(x9)  c.lw x9, 0(x11)
-    ## loads address from x11 into x9, writes x8 into mem[x9]
-    send_write( DMPROGBUF1, 0xc1840491 )  #  c.sw x9, 0(x11) c.addi x9, 4
-    ## adds 4 to address in x9, writes it back out to x11 for next round
-    send_write( DMPROGBUF2, 0x9002c214 )  # c.sw x13,0(x12) // Acknowledge the page write. c.ebreak
-    ## copies the PG/BUF_LOAD flags into flash controller
     
     send_write( DMDATA0, 0xe00000f4 )  #;   // DATA0's location in memory.
-    send_write( DMCOMMAND, 0x0023100a )  #; // Copy data to x10
+    send_write( DMCOMMAND, 0x00231008 )  #; // Copy data to x8
     send_write( DMDATA0, 0xe00000f8 )  #;   // DATA1's location in memory.
-    send_write( DMCOMMAND, 0x0023100b )  #; // Copy data to x11
-    send_write( DMDATA0, 0x40022010 )  #; // FLASH->CTLR
-    send_write( DMCOMMAND, 0x0023100c )  #; // Copy data to x12
-    send_write( DMDATA0, CR_PAGE_PG|CR_BUF_LOAD)  #;
-    send_write( DMCOMMAND, 0x0023100d )  #; // Copy data to x13
+    send_write( DMCOMMAND, 0x00231009 )  #; // Copy address to x9
 
-    send_write( DMDATA1, address )  #;
     send_write( DMDATA0, data )  #;
-    send_write( DMCOMMAND, 0x00271008 )  #; // Copy data0 to x8, and execute program.
+    send_write( DMDATA1, address )  #;
     
+    send_write( DMPROGBUF0, 0x408c_4008 )  #  
+    send_write( DMPROGBUF1, 0x9002_c188 )  #    
+    
+    send_write( DMCOMMAND, ((1 << 18) | (1<<21)) )  # execute program
     wait_for_done()
 
-def write_word(data, address):
-    send_write( DMDATA1, address )  #;
-    send_write( DMDATA0, data )  # load data into DMDATA0;
+def read_word(address):
+   
+    send_write( DMABSTRACTAUTO, 0x00000000 )  #; // Disable Autoexec.
+    
+    send_write( DMDATA0, 0xe00000f4 )  #;   // DATA0's location in memory.
+    send_write( DMCOMMAND, 0x00231008 )  #; // Copy data to x8
+    send_write( DMDATA0, 0xe00000f8 )  #;   // DATA1's location in memory.
+    send_write( DMCOMMAND, 0x00231009 )  #; // Copy address to x9
+
+    send_write( DMDATA0, address )  # ;
+    
+    send_write( DMPROGBUF0, 0x4108_4008)   # lw x10 0(x10)   lw x10 0(x8) 
+    send_write( DMPROGBUF1, 0x9002_c008)     # sw x10, 0(x8)
+    # break 
+    send_write( DMCOMMAND, ((1 << 18) | (1<<21)) )  # execute program
     wait_for_done()
+    data = send_read(DMDATA0)
+    return(data)
+
+
+enter_debug_mode()
+send_write( DMABSTRACTCS, 0x00000700 )  #;
+#print_status_capabilities()
+write_word(0x20000000, 0x12345678)
+dm = send_read(DMABSTRACTCS)
+b32(dm)
+
+#print("0x12345678")
+back = read_word(0x20000000)
+print(hex(back))
+
+mem = read_word(0x1FFFF7E0)
+b32(mem)
+
+# cs = send_read(DMABSTRACTCS)
+# print(hex(cs))# 2, 27
+
+
+
 
 def flash_bin(filename):
     binary_image = open(filename, "b").read()
@@ -173,16 +204,7 @@ def reset_and_resume():
     send_write( DM_CTRL, 0x00000001)  
     send_write( DM_CTRL, 0x40000001)
 
-enter_debug_mode()
-print_status_capabilities()
-# print("flash size")
-# flash_size = send_read(0x1FFFF7E0)
-# b32(flash_size)
-# print("hart")
-# hart = send_read(0x12)
-# b32(hart)
 
-# flash_bin("blink.bin")
-# reset_and_resume()
+
 
 
