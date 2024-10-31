@@ -175,14 +175,14 @@ def reset_and_resume():
 
 enter_debug_mode()
 print_status_capabilities()
-print("flash size")
-flash_size = send_read(0x1FFFF7E0)
+# print("flash size")
+# flash_size = send_read(0x1FFFF7E0)
 # b32(flash_size)
 # print("hart")
 # hart = send_read(0x12)
 # b32(hart)
 
-flash_bin("blink.bin")
-reset_and_resume()
+# flash_bin("blink.bin")
+# reset_and_resume()
 
 
