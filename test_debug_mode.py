@@ -162,7 +162,7 @@ def simple_64_byte_write(start_address, data):
     
     for i in range(16): 
         addr = start_address+(i*4)
-        value = int.from_bytes(data[(i*4):(i*4)+4])
+        value = int.from_bytes(data[(i*4):(i*4)+4], "big")
         print(hex(addr), hex(value))
         write_word( addr, value )
 
@@ -195,7 +195,7 @@ unlock_flash()
 erase_chip()
 flash_binary("blink2.bin")
 
-for i in range(4096):
+for i in range(40):
     print(i)
     print(hex(read_word(0x0800_0000+i*4)))
 
