@@ -3,7 +3,7 @@
 
 MPREMOTE:=mpremote
 
-all: copy_blink test_debug_mode
+all: test_debug_mode
 
 copy_pio: 
 	${MPREMOTE} cp singlewire_pio.py :
