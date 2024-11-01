@@ -191,15 +191,15 @@ def flash_binary(filename):
 
 enter_debug_mode()
 
-#unlock_flash()
-#erase_chip()
-#flash_binary("blink2.bin")
+unlock_flash()
+erase_chip()
+flash_binary("blink2.bin")
 
 for i in range(4096):
     print(i)
     print(hex(read_word(0x0800_0000+i*4)))
 
-#reset_and_resume()
+reset_and_resume()
 
 
 
