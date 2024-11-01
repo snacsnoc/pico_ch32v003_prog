@@ -158,6 +158,7 @@ def simple_64_byte_write(start_address, data):
 
     write_word( 0x40022010, CR_PAGE_PG )  ##   // (intptr_t)&FLASH->CTLR = 0x40022010  
     write_word( 0x40022010, CR_BUF_RST | CR_PAGE_PG );  
+    write_word( 0x40022014, start_address )  # ;
     wait_for_flash()
     
     for i in range(16): 
@@ -165,8 +166,8 @@ def simple_64_byte_write(start_address, data):
         value = int.from_bytes(data[(i*4):(i*4)+4], "big")
         print(hex(addr), hex(value))
         write_word( addr, value )
+        write_word( 0x40022010, CR_PAGE_PG | 0x00040000 ); #; // FLASH_CTLR_BUF_LOAD = 0x00040000   
 
-    write_word( 0x40022014, start_address )  # ;
     write_word( 0x40022010, CR_PAGE_PG|CR_STRT_Set ) #;  // R32_FLASH_CTLR
     wait_for_flash()
 
