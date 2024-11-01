@@ -1,5 +1,6 @@
 
 import singlewire_pio
+import time
 import gc
 from machine import Pin
 from constants import *
