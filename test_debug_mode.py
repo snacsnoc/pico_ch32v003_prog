@@ -22,6 +22,10 @@ SM5_EXECCTRL = const(0xe4)
 SM6_EXECCTRL = const(0xfc)
 SM7_EXECCTRL = const(0x114)
 
+## What mode of programming we are currently engaged in.
+progmode = 0
+progptr = 0
+
 ## Set side-set to control pindirs state machine
 machine.mem32[PIO1_BASE + SM4_EXECCTRL] |= (1 << SIDE_PINDIR)
 
@@ -57,6 +61,8 @@ def send_read(address, delay=inter_packet_delay):
     return(swio_sm.get())
 
 def enter_debug_mode():
+    global progmode
+    global progptr
     send_write(WCH_DM_SHDWCFGR, OUTSTA)
     send_write(WCH_DM_CFGR, OUTSTA) ## OUTSTA: 0: The debug slave has output function.
     ## guarantee halt
@@ -65,6 +71,25 @@ def enter_debug_mode():
     send_write(DM_CTRL, 0x80000001) ## 1: halt
     send_write(DM_CTRL, 0x80000001) ## 1: halt
     send_write(DM_CTRL, 0x80000001) ## 1: halt
+
+    ## Setup several registers for usage later.
+    send_write( DMDATA0, 0x40022010 )  #;   // FLASH->CTLR
+    send_write( DMCOMMAND, 0x0023100c )  #; // Copy data to x12
+    send_write( DMDATA0, CR_PAGE_PG | 0x00040000 )  #;   // FLASH_CTLR_BUF_LOAD = 0x00040000
+    send_write( DMCOMMAND, 0x0023100d )  #; // Copy data to x13
+    send_write( DMDATA0, 0xe00000f4 )  #;   // DATA0's location in memory.
+    send_write( DMCOMMAND, 0x00231008 )  #; // Copy data to x8
+    send_write( DMDATA0, 0xe00000f8 )  #;   // DATA1's location in memory.
+    send_write( DMCOMMAND, 0x00231009 )  #; // Copy address to x9
+    send_write( DMABSTRACTCS, 7<<8 )   # // Clear out any abstract command execution errors.
+
+    send_write( DMABSTRACTAUTO, 0x00000000 )  #; // Disable autoexec on DATA0
+    # We don't need to autoexec, if we don't want to, we can manually exec with the following:
+    #send_write( DMCOMMAND, ((1 << 18) | (1<<21)) )
+
+    progmode = 0
+    progptr = 0
+
 
 def print_status_capabilities():
     status = send_read(DM_STATUS)
@@ -86,38 +111,46 @@ def wait_for_done():
             is_busy = False
 
 def write_word(address, data):
-    send_write( DMABSTRACTAUTO, 0x00000000 )  #; // Disable Autoexec.
-    
-    send_write( DMDATA0, 0xe00000f4 )  #;   // DATA0's location in memory.
-    send_write( DMCOMMAND, 0x00231008 )  #; // Copy data to x8
-    send_write( DMDATA0, 0xe00000f8 )  #;   // DATA1's location in memory.
-    send_write( DMCOMMAND, 0x00231009 )  #; // Copy address to x9
+    global progmode
+    if progmode != 1:
+        send_write( DMPROGBUF0, 0x408c_4008 )  #   c.lw x11, 0(x9) <-  c.lw x10, 0(x8)
+        send_write( DMPROGBUF1, 0x9002_c188 )  #   c.ebreak    <- c.sw x10, 0(x11)
+        send_write( DMABSTRACTAUTO, 0x00000001 )  #; // Enable autoexec on DATA0
+        progmode = 1
+    send_write( DMDATA1, address )  #; Write address we want to write
+    send_write( DMDATA0, data )  #; This will autoexec
+    wait_for_done()
 
-    send_write( DMDATA0, data )  #;
-    send_write( DMDATA1, address )  #;
-    
-    send_write( DMPROGBUF0, 0x408c_4008 )  #  
-    send_write( DMPROGBUF1, 0x9002_c188 )  #    
-    
-    send_write( DMCOMMAND, ((1 << 18) | (1<<21)) )  # execute program
+def write_word_flash(address, data):
+    global progmode, progptr
+    if address != progptr or progmode != 3:
+        send_write( DMDATA1, address )  #; Only need to load address in once, will autoincrement
+        progptr = address
+
+    if progmode != 3:
+        # Assume x9 contains the address we want to write to.
+        send_write( DMPROGBUF0, 0x408c_4008 )  #   c.lw x11, 0(x9) <-  c.lw x10, 0(x8)
+        send_write( DMPROGBUF1, 0x0591_c188 )  #   c.addi x11, 4 <- c.sw x10, 0(x11)
+        send_write( DMPROGBUF2, 0xc08c_c214 )  #   c.sw x11, 0(x9) <- c.sw x13, 0(x12)
+        send_write( DMPROGBUF3, 0x9002_9002 )  #   c.ebreak <- c.ebreak
+        send_write( DMABSTRACTAUTO, 0x00000001 )  #; Enable autoexec on DATA0
+        progmode = 3
+
+    send_write( DMDATA0, data ) #; this will autoexec the flash algo.
+    progptr += 4
     wait_for_done()
 
 def read_word(address):
-    send_write( DMABSTRACTAUTO, 0x00000000 )  #; // Disable Autoexec.
-    
-    send_write( DMDATA0, 0xe00000f4 )  #;   // DATA0's location in memory.
-    send_write( DMCOMMAND, 0x00231008 )  #; // Copy data to x8
-    send_write( DMDATA0, 0xe00000f8 )  #;   // DATA1's location in memory.
-    send_write( DMCOMMAND, 0x00231009 )  #; // Copy address to x9
-
-    send_write( DMDATA0, address )  # ;
-    
-    send_write( DMPROGBUF0, 0x4108_4008)   # lw x10 0(x10)   lw x10 0(x8) 
-    send_write( DMPROGBUF1, 0x9002_c008)     # sw x10, 0(x8)
-    # break 
-    send_write( DMCOMMAND, ((1 << 18) | (1<<21)) )  # execute program
+    global progmode
+    if progmode != 2:
+        send_write( DMPROGBUF0, 0x4108_4008)   # c.lw x10, 0(x10) <-  c.lw x10, 0(x8)
+        send_write( DMPROGBUF1, 0x9002_c088)   # break     <- sw x10, 0(x9) 
+        send_write( DMABSTRACTAUTO, 0x00000000 )  #; // Disable autoexec (Seems to cause an issue for reads)
+        progmode = 2
+    send_write( DMDATA0, address )  # ; Program will autoexec
+    send_write( DMCOMMAND, ((1 << 18) | (1<<21)) )
     wait_for_done()
-    data = send_read(DMDATA0)
+    data = send_read(DMDATA1)
     return(data)
 
 def wait_for_flash():
@@ -160,13 +193,13 @@ def simple_64_byte_write(start_address, data):
     write_word( 0x40022010, CR_BUF_RST | CR_PAGE_PG );  
     write_word( 0x40022014, start_address )  # ;
     wait_for_flash()
-    
     for i in range(16): 
         addr = start_address+(i*4)
         value = int.from_bytes(data[(i*4):(i*4)+4], "little")
-        print(hex(addr), hex(value))
-        write_word( addr, value )
-        write_word( 0x40022010, CR_PAGE_PG | 0x00040000 ); #; // FLASH_CTLR_BUF_LOAD = 0x00040000   
+        #print(hex(addr), hex(value))
+        #write_word( addr, value )
+        #write_word( 0x40022010, CR_PAGE_PG | 0x00040000 ); #; // FLASH_CTLR_BUF_LOAD = 0x00040000   
+        write_word_flash( addr, value )
 
     write_word( 0x40022010, CR_PAGE_PG|CR_STRT_Set ) #;  // R32_FLASH_CTLR
     wait_for_flash()
@@ -191,12 +224,15 @@ def flash_binary(filename):
         simple_64_byte_write(0x0800_0000 + (i+1)*64, residual)
 
 enter_debug_mode()
+enter_debug_mode()
 
+flash_start_time = time.ticks_us()
 unlock_flash()
 erase_chip()
 flash_binary("blink.bin")
+print( "Time spent: " + str(time.ticks_us() - flash_start_time) )
 
-for i in range(40):
+for i in range(4):
     print(hex(i) + " " + hex(read_word(0x0800_0000+i*4)))
 
 reset_and_resume()
