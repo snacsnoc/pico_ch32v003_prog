@@ -156,8 +156,8 @@ def erase_chip():
 def simple_64_byte_write(start_address, data):
     """start_address = MUST_BE_64_BYTE_ALIGNED;"""
 
-    write_word( 0x40022010, CR_PAGE_PG )  ##   // (intptr_t)&FLASH->CTLR = 0x40022010  
-    write_word( 0x40022010, CR_BUF_RST | CR_PAGE_PG );  
+    write_word( 0x40022010, CR_BUF_RST | CR_PAGE_PG )
+    b32(read_word(0x40022010))
     wait_for_flash()
     
     for i in range(16): 
@@ -165,10 +165,13 @@ def simple_64_byte_write(start_address, data):
         value = int.from_bytes(data[(i*4):(i*4)+4])
         print(hex(addr), hex(value))
         write_word( addr, value )
+        write_word( 0x40022010, CR_BUF_LOAD) # set FLASH->CTLR BUFLOAD bit to load buffer
+        wait_for_flash()
 
     write_word( 0x40022014, start_address )  # ;
-    write_word( 0x40022010, CR_PAGE_PG|CR_STRT_Set ) #;  // R32_FLASH_CTLR
+    write_word( 0x40022010, CR_STRT_Set ) #;  // R32_FLASH_CTLR
     wait_for_flash()
+
 
 ## reset and resume
 def reset_and_resume():
