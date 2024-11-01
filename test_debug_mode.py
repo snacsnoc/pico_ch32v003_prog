@@ -163,7 +163,7 @@ def simple_64_byte_write(start_address, data):
     
     for i in range(16): 
         addr = start_address+(i*4)
-        value = int.from_bytes(data[(i*4):(i*4)+4], "big")
+        value = int.from_bytes(data[(i*4):(i*4)+4], "little")
         print(hex(addr), hex(value))
         write_word( addr, value )
         write_word( 0x40022010, CR_PAGE_PG | 0x00040000 ); #; // FLASH_CTLR_BUF_LOAD = 0x00040000   
@@ -194,11 +194,10 @@ enter_debug_mode()
 
 unlock_flash()
 erase_chip()
-flash_binary("blink2.bin")
+flash_binary("blink.bin")
 
 for i in range(40):
-    print(i)
-    print(hex(read_word(0x0800_0000+i*4)))
+    print(hex(i) + " " + hex(read_word(0x0800_0000+i*4)))
 
 reset_and_resume()
 
