@@ -5,7 +5,10 @@ from constants import *
 
 class CH32_Flash():
     def __init__(self, pin_number):
-        self.prog_pin = Pin(pin_number, mode=Pin.IN, pull=Pin.PULL_UP)
+
+        ports = [None, 7, 5, 3, 22, 20, 18]
+
+        self.prog_pin = Pin(ports[pin_number], mode=Pin.IN, pull=Pin.PULL_UP)
         self.swio_sm = rp2.StateMachine(4, singlewire_pio.singlewire_pio, freq=12_000_000,
                                         sideset_base=self.prog_pin, out_base=self.prog_pin, 
                                             set_base=self.prog_pin, in_base=self.prog_pin)
@@ -216,7 +219,9 @@ class CH32_Flash():
         self.reset_and_resume()
 
 
-flasher = CH32_Flash(18)
-flasher.flash_binary("blink.bin")
+
+## Connect the ch32v003 board to Port 6 
+flasher = CH32_Flash(5)
+flasher.flash_binary("blink2.bin")
 
 
