@@ -36,4 +36,16 @@ DMPROGBUF5 = const(0x25)
 DMPROGBUF6 = const(0x26)
 DMPROGBUF7 = const(0x27)
 
+## Some unavoidable bit-twiddling
+SIDE_PINDIR = const(29)
+PIO0_BASE = const(0x50200000)
+PIO1_BASE = const(0x50300000)
+SM0_EXECCTRL = const(0x0cc)  # p 375
+SM1_EXECCTRL = const(0xe4)
+SM2_EXECCTRL = const(0xfc)
+SM3_EXECCTRL = const(0x114)
+SM4_EXECCTRL = const(0x0cc)  # p 375
+SM5_EXECCTRL = const(0xe4)
+SM6_EXECCTRL = const(0xfc)
+SM7_EXECCTRL = const(0x114)
 

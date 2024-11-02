@@ -1,7 +1,28 @@
 import time
+import rp2
+import machine
 import singlewire_pio
+import gc
+import sys
+
 from machine import Pin
 from constants import *
+
+## To test
+'''
+from flash_ch32v003 import CH32_Flash
+flasher = CH32_Flash(1)
+flasher.flash_binary("blink.bin")
+'''
+or
+'''
+from flash_ch32v003 import CH32_Flash
+flasher = CH32_Flash(1)
+flasher.flash_binary("cap_touch_adc.bin")
+flasher.monitor()
+'''
+
+
 
 class CH32_Flash():
     def __init__(self, pin_number):
@@ -193,6 +214,48 @@ class CH32_Flash():
         self.send_write( DM_CTRL, 0x00000001)  
         self.send_write( DM_CTRL, 0x40000001)
 
+    def displaychar(self, ascii):
+        sys.stdout.write( chr(ascii) );
+
+    def monitor(self):
+        self.send_write( WCH_DM_SHDWCFGR, OUTSTA )
+        self.send_write( WCH_DM_CFGR, OUTSTA ) ## OUTSTA: 0: The debug slave has output function.
+        self.send_write( DM_CTRL, 0x80000001 )
+        self.send_write( DM_CTRL, 0x80000003 )
+        self.send_write( WCH_DM_SHDWCFGR, OUTSTA) # Try again, just in case.
+        self.send_write( WCH_DM_CFGR, OUTSTA )
+        self.send_write( DM_CTRL, 0x80000001 )
+        self.send_write( DM_CTRL, 0x80000003 )
+        self.send_write( DM_CTRL, 0x00000001 )
+        self.send_write( DM_CTRL, 0x40000001 )
+
+        while True:
+            d0 = self.send_read( DMDATA0 )
+            statusword = (d0 & 0xff);
+            if statusword & 0x80:
+                swb = (statusword&0x7f);
+                if swb > 4:
+                    to_read = swb - 4;
+                    d1 = 0
+                    if to_read > 3:
+                        d1 = self.send_read( DMDATA1 )
+                    if to_read > 0:
+                        self.displaychar( ( ( d0 >> 8 ) & 0xff) )
+                    if to_read > 1:
+                        self.displaychar( ( ( d0 >> 16 ) & 0xff) );
+                    if to_read > 2:
+                        self.displaychar( ( ( d0 >> 24 ) & 0xff) );
+                    if to_read > 3:
+                        self.displaychar( ( ( d1 >> 0 ) & 0xff) );
+                    if to_read > 4:
+                        self.displaychar( ( ( d1 >> 8 ) & 0xff) );
+                    if to_read > 5:
+                        self.displaychar( ( ( d1 >> 16 ) & 0xff) );
+                    if to_read > 6:
+                        self.displaychar( ( ( d1 >> 24 ) & 0xff) );
+                self.send_write( DMDATA0, 0 )
+                gc.collect()
+
     def flash_binary(self, filename):
         self.enter_debug_mode()
         self.enter_debug_mode()
@@ -219,9 +282,8 @@ class CH32_Flash():
         self.reset_and_resume()
 
 
-
-## Connect the ch32v003 board to Port 6 
-flasher = CH32_Flash(5)
-flasher.flash_binary("blink2.bin")
-
+## Connect the ch32v003 board to Port 1 
+if __name__ == "main":
+    flasher = CH32_Flash(1)
+    flasher.flash_binary("blink2.bin")
 
