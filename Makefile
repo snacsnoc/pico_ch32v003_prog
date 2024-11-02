@@ -3,7 +3,7 @@
 
 MPREMOTE:=mpremote
 
-all: test_debug_mode
+all: flash_ch32v003
 
 copy_pio: 
 	${MPREMOTE} cp singlewire_pio.py :
