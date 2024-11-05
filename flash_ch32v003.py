@@ -14,7 +14,7 @@ from flash_ch32v003 import CH32_Flash
 flasher = CH32_Flash(1)
 flasher.flash_binary("blink.bin")
 '''
-or
+# or
 '''
 from flash_ch32v003 import CH32_Flash
 flasher = CH32_Flash(1)
