@@ -30,12 +30,12 @@ class CH32_Flash():
         ports = [None, 7, 5, 3, 22, 20, 18]
 
         self.prog_pin = Pin(ports[pin_number], mode=Pin.IN, pull=Pin.PULL_UP)
-        self.swio_sm = rp2.StateMachine(4, singlewire_pio.singlewire_pio, freq=12_000_000,
+        self.swio_sm = rp2.StateMachine(1, singlewire_pio.singlewire_pio, freq=12_000_000,
                                         sideset_base=self.prog_pin, out_base=self.prog_pin, 
                                             set_base=self.prog_pin, in_base=self.prog_pin)
         ## Some unavoidable bit-twiddling
         ## Set side-set to control pindirs state machine
-        machine.mem32[PIO1_BASE + SM4_EXECCTRL] |= (1 << SIDE_PINDIR)
+        machine.mem32[PIO0_BASE + SM1_EXECCTRL] |= (1 << SIDE_PINDIR)
 
         ## What mode of programming we are currently engaged in.
         self.progmode = 0
