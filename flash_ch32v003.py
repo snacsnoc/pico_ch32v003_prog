@@ -25,11 +25,15 @@ flasher.monitor()
 
 
 class CH32_Flash():
-    def __init__(self, pin_number):
+    def __init__(self, pin_number, map_to_port=True):
 
         ports = [None, 7, 5, 3, 22, 20, 18]
+        if map_to_port:
+            gpio_pin = ports[pin_number]
+        else:
+            gpio_pin = pin_number
 
-        self.prog_pin = Pin(ports[pin_number], mode=Pin.IN, pull=Pin.PULL_UP)
+        self.prog_pin = Pin(gpio_pin, mode=Pin.IN, pull=Pin.PULL_UP)
         self.swio_sm = rp2.StateMachine(1, singlewire_pio.singlewire_pio, freq=12_000_000,
                                         sideset_base=self.prog_pin, out_base=self.prog_pin, 
                                             set_base=self.prog_pin, in_base=self.prog_pin)
