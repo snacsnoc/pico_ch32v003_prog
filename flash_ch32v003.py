@@ -1,12 +1,14 @@
 import time
 import rp2
 import machine
-import singlewire_pio
+import pico_ch32v003_prog.singlewire_pio as singlewire_pio
 import gc
 import sys
 
 from machine import Pin
-from constants import *
+from pico_ch32v003_prog.constants import *
+
+AggressiveGC = True
 
 ## To test
 '''
@@ -37,7 +39,10 @@ class CH32_Flash():
         self.swio_sm = rp2.StateMachine(1, singlewire_pio.singlewire_pio, freq=12_000_000,
                                         sideset_base=self.prog_pin, out_base=self.prog_pin, 
                                             set_base=self.prog_pin, in_base=self.prog_pin)
+        self.swio_sm.active(0)
+        
         ## Some unavoidable bit-twiddling
+        
         ## Set side-set to control pindirs state machine
         machine.mem32[PIO0_BASE + SM1_EXECCTRL] |= (1 << SIDE_PINDIR)
 
@@ -46,6 +51,10 @@ class CH32_Flash():
         self.progptr = 0
         self.inter_packet_delay = 60 
 
+    def deinit(self):
+        self.swio_sm.active(0)
+        rp2.PIO(1).remove_program(singlewire_pio.singlewire_pio)
+        self.swio_sm = None
     def read_address(self, register):
         return(register << 1)
     def write_address(self, register):
@@ -266,17 +275,27 @@ class CH32_Flash():
         flash_start_time = time.ticks_us()
         self.unlock_flash()
         self.erase_chip()
-
-        data = open(filename, "b").read()
+        fhandle = open(filename, "b")
         
-        for i in range(len(data) // 64): 
-            byte_block = data[i*64:(i+1)*64]
-            self.simple_64_byte_write(0x0800_0000 + i*64, byte_block)
-        if len(data) % 64:
-            residual = bytearray([0xff] * 64) 
-            for j, this_byte in enumerate(data[(i+1)*64:]):
+        datalen = 0
+        data = fhandle.read(64)
+        while len(data) == 64:
+            byte_block = data 
+            self.simple_64_byte_write(0x0800_0000 + datalen, byte_block)
+            datalen += 64
+            data = fhandle.read(64)
+            # print(f'B{datalen},', end='')
+            if AggressiveGC:
+                gc.collect()
+        
+        
+        if len(data):
+            # print(f'\n left overs data {data}')
+            residual = bytearray([0xff] * 64)
+            for j, this_byte in enumerate(data):
                 residual[j] = this_byte
-            self.simple_64_byte_write(0x0800_0000 + (i+1)*64, residual)
+            # print(f'\n residual {residual}')
+            self.simple_64_byte_write(0x0800_0000 + datalen, residual)
 
         print( "Time spent: " + str(time.ticks_us() - flash_start_time) )
 
