@@ -1,12 +1,12 @@
 import time
 import rp2
 import machine
-import pico_ch32v003_prog.singlewire_pio as singlewire_pio
+import singlewire_pio as singlewire_pio
 import gc
 import sys
 
 from machine import Pin
-from pico_ch32v003_prog.constants import *
+from constants import *
 
 AggressiveGC = True
 
@@ -307,6 +307,6 @@ class CH32_Flash():
 
 ## Connect the ch32v003 board to Port 1 
 if __name__ == "main":
-    flasher = CH32_Flash(1)
-    flasher.flash_binary("blink2.bin")
+    flasher = CH32_Flash(28)
+    flasher.flash_binary("blink.bin")
 
